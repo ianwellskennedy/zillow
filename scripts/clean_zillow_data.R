@@ -20,6 +20,7 @@ county_shapefile_file_path <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/USAS
 
 output_filepath_for_zhvi_shapefile <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow Data/zillow_data.shp" 
 output_filepath_for_inventory_shapefile <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow Data/realtor_inventory_data.shp"
+
 # Reading in the empty shape files ----
 
 zip_shapefile <- st_read(zip_shapefile_file_path) 
