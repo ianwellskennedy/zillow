@@ -1,32 +1,23 @@
 # Packages ----
 
 # Set the packages to read in
-packages <- c("tidyverse", "tidycensus", "ggmap", "sf", "openxlsx", "arcgisbinding", "conflicted")
+packages <- c("tidyverse", "tidycensus", "ggmap", "sf", "openxlsx", "arcgisbinding", "conflicted", "zoo")
 
-# Function to check and install missing packages
-install_if_missing <- function(package) {
-  if (!requireNamespace(package, quietly = TRUE)) {
-    install.packages(package, dependencies = TRUE)
-  }
+# Install packages that are not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
 }
 
-# Apply the function to each package
-invisible(sapply(packages, install_if_missing))
-
 # Load the packages
-library(tidyverse)
-library(tidycensus)
-library(ggmap)
-library(sf)
-library(openxlsx)
-library(arcgisbinding)
-library(conflicted)
-library(fredr)
+invisible(lapply(packages, library, character.only = TRUE))
+
+# Remove unneeded variables
+rm(packages, installed_packages)
 
 # Prefer certain packages for certain functions
 conflicts_prefer(dplyr::filter, dplyr::lag, lubridate::year, base::`||`, base::is.character, base::`&&`, stats::cor, base::as.numeric)
-
-rm(install_if_missing, packages)
 
 # Set the FRED API Key, if a new user is using this you will have to obtain an API key from here: https://fred.stlouisfed.org/docs/api/api_key.html
 fredr_set_key(key = 'c1f7f3d38687246c6d6e5b83898af5a1')
@@ -41,22 +32,23 @@ geo_level_for_data_pull <- "cbsa" # Define the geography for the ACS data downlo
 read_in_geometry <- FALSE # Change this to TRUE to pull in spatial data along with the data download 
 show_api_call = TRUE # Show the call made to the Census API in the console, this will help if an error is thrown
 
-metro_shapefile_file_path <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/shapefiles/2023/CBSAs/cb_2023_us_cbsa_500k.shp" # Input the file path for the shape file that you would like to read in. 
-                                                                                                          # See 'R:/ADHOC-JBREC/Ian-K/USAShapefiles/2023' different geography options.
-zillow_data_file_path <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/Inputs/Zillow/Metro_total_monthly_payment_downpayment_0.20_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.xlsx"
+acs_variables_file_path <- "inputs/acs_variables_2023_acs1.xlsx"
 
-zillow_census_metro_crosswalk_file_path <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/Inputs/Zillow/zillow_metro_crosswalk.xlsx"
+metro_shapefile_file_path <- "C:/Users/ianwe/Downloads/shapefiles/2024/CBSAs/cb_2024_us_cbsa_5m.shp"
+zillow_data_file_path <- "inputs/Metro_total_monthly_payment_downpayment_0.20_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
 
-output_filepath_for_cleaned_data <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/Outputs/metro_housing_affordability_data.xlsx" # Change this to a file path where you would like to output a cleaned Excel file.
+zillow_census_metro_crosswalk_file_path <- "inputs/zillow_metro_crosswalk.xlsx"
 
-output_filepath_for_shapefile <- "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/shapefiles/metro_housing_affordability_data.shp" # Change this to a file path for where you would like to output a cleaned shape file. IGNORE IF NOT OUTPUTTING A SHAPEFILE!
+output_filepath_for_cleaned_data <- "outputs/metro_housing_affordability_data.xlsx" # Change this to a file path where you would like to output a cleaned Excel file.
+
+output_filepath_for_shapefile <- "C:/Users/ianwe/Downloads/ArcGIS projects for github/zillow/shapefiles/metro_housing_affordability_data.shp" # Change this to a file path for where you would like to output a cleaned shape file. IGNORE IF NOT OUTPUTTING A SHAPEFILE!
 
 # Create a variable list to read in ----
 
 # Load the variables for the year / dataset selected above
 # acs_variables <- load_variables(year = acs_year, dataset = acs_data_type)
 
-variables <- read.xlsx("C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/Inputs/acs_variables_2023_acs1.xlsx", sheet = 'Income Variables')
+variables <- read.xlsx(acs_variables_file_path, sheet = 'Income Variables')
 
 # Select 'name' and 'amended_label' (and rename 'name' to code')
 variables <- variables %>%
@@ -96,8 +88,6 @@ data <- data %>%
   pivot_wider(names_from = 'variable', values_from = 'estimate', id_cols = c('GEOID', 'NAME')) %>%
   arrange(pop)
 
-# write.xlsx(data, "C:/Users/ikennedy/OneDrive - JBREC/Documents/Projects_2023_2024/Mappy Mondays/Zillow_Realtor_Redfin_Data/Inputs/Zillow/metro_census_data_2023.xlsx")
-
 # Read in inflation ----
 
 wage_growth <- fredr(series_id = 'CIU1020000000000I', 
@@ -108,40 +98,62 @@ wage_growth <- fredr(series_id = 'CIU1020000000000I',
   select(date, value) 
 
 wage_growth_current <- wage_growth %>%
-  filter(date == '2024-10-01') 
+  filter(date == '2025-04-01') 
 wage_growth_current <- wage_growth_current$value
 wage_growth <- wage_growth %>%
   mutate(index = wage_growth_current / value) 
 
-wage_growth_to_2024 <- wage_growth %>%
+wage_growth_to_2025 <- wage_growth %>%
   filter(date == '2023-10-01')
-wage_growth_to_2024 <- wage_growth_to_2024$index
+wage_growth_to_2025 <- wage_growth_to_2025$index
 
 # Inflation adjust ACS data ----
 
 data <- data %>%
-  mutate(med_hh_inc_24 = med_hh_inc * wage_growth_to_2024,
-         med_hh_inc_owners_24 = med_hh_inc_owners * wage_growth_to_2024, 
-         med_hh_inc_renters_24 = med_hh_inc_renters * wage_growth_to_2024) 
+  mutate(med_hh_inc_25 = med_hh_inc * wage_growth_to_2025,
+         med_hh_inc_owners_25 = med_hh_inc_owners * wage_growth_to_2025, 
+         med_hh_inc_renters_25 = med_hh_inc_renters * wage_growth_to_2025) 
 
 # Read in Zillow data ----
 
-zillow_data <- read.xlsx(zillow_data_file_path, sheet = 'ttm')
-
-# Convert numeric-looking column names to actual Date
-excel_date_origin <- as.Date("1899-12-30")  # Excel origin
-
-colnames(zillow_data) <- sapply(colnames(zillow_data), function(x) {
-  if (grepl("^[0-9]+$", x)) {
-    # Convert to Date if it's numeric
-    as.character(as.Date(as.numeric(x), origin = excel_date_origin))
-  } else {
-    x  # Leave non-numeric column names unchanged
-  }
-})
+zillow_data <- read.csv(zillow_data_file_path)
+names(zillow_data) <- str_remove(names(zillow_data), "X")
 
 zillow_data <- zillow_data %>%
-  select(metro_code, pop_rank, `2024-12-31`) %>%
+  pivot_longer(names_to = 'date', values_to = 'paymnt', cols = `2012.01.31`:ncol(zillow_data))
+
+zillow_data <- zillow_data %>%
+  mutate(date = as.Date(date, format = "%Y.%m.%d"),
+         RegionID = as.character(RegionID)) %>%
+  filter(RegionType == 'msa')
+
+# Convert numeric-looking column names to actual Date
+#excel_date_origin <- as.Date("1899-12-30")  # Excel origin
+
+# colnames(zillow_data) <- sapply(colnames(zillow_data), function(x) {
+#   if (grepl("^[0-9]+$", x)) {
+#     # Convert to Date if it's numeric
+#     as.character(as.Date(as.numeric(x), origin = excel_date_origin))
+#   } else {
+#     x  # Leave non-numeric column names unchanged
+#   }
+# })
+
+zillow_data <- zillow_data %>%
+  rename(zillow_metro_code = RegionID, pop_rank = SizeRank) %>%
+  select(zillow_metro_code, pop_rank, date, paymnt) %>%
+  arrange(zillow_metro_code, date)
+
+zillow_data <- zillow_data %>%
+  group_by(zillow_metro_code) %>%
+  mutate(
+    yoy = (paymnt - lag(paymnt, 12))/ lag(paymnt, 12),
+    ttm = rollmean(paymnt, k = 12, align = "right", fill = NA),
+    ttm_yoy = (ttm - lag(ttm, 12))/ lag(ttm, 12)
+    ) %>%
+  ungroup() 
+
+zillow_data <- zillow_data %>%
   rename(med_mortgage_payment_20_down_dec_2024 = `2024-12-31`, zillow_metro_code = metro_code) %>%
   mutate(zillow_metro_code = as.character(zillow_metro_code))
 
@@ -155,18 +167,21 @@ zillow_data <- zillow_data %>%
 
 zillow_data <- zillow_data %>% 
   select(ends_with('metro_name'), GEOID, zillow_metro_code, everything())
-         
+
+zillow_data_current_month <- zillow_data %>%
+  filter(date == max(zillow_data$date))
+
 # Join data ----
 
 joined_data <- data %>%
-  left_join(zillow_data, by = 'GEOID')
+  left_join(zillow_data_current_month, by = 'GEOID')
 
 joined_data <- joined_data %>%
   filter(!is.na(zillow_metro_name)) %>%
   select(-c(pop_rank, starts_with('zillow_'), census_metro_name)) 
 
 joined_data <- joined_data %>%
-  mutate(ann_mort_pymnt = med_mortgage_payment_20_down_dec_2024 * 12,
+  mutate(ann_mort_pymnt = paymnt * 12,
          rnt_shr_of_med = ann_mort_pymnt / med_hh_inc_renters)
 
 # Output tabular data ----
@@ -186,14 +201,12 @@ metro_shapefile_information <- metro_shapefile %>%
   st_drop_geometry() %>%
   select(-c(LSAD, ALAND, AWATER))
 
-# Create a spatial file and plot it! (ignore if not outputting a shapefile) ----
+# Create a spatial file (ignore if not outputting a shapefile) ----
 
 # Join the shapefile geometry to the summarized data by GEOID:
 spatial_data <- joined_data %>%
-  left_join(metro_shapefile_geometry, by = 'GEOID')
-
-# Convert 'spatial_data' to an sf object!
-spatial_data <- st_as_sf(spatial_data)
+  left_join(metro_shapefile_geometry, by = 'GEOID') %>%
+  st_as_sf()
 
 # Output spatial data (ignore if not outputting a shapefile) ----
 
