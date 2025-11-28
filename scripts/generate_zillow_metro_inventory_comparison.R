@@ -91,6 +91,8 @@ zillow_data_spatial <- zillow_data %>%
   st_as_sf() %>%
   filter(!is.na(census_metro_name))
 
+test <- zillow_data %>%
+  filter(date == '2025-10-31' )
 # Output the spatial file ----
 
 # Check to make sure there is an Active ArcGIS Installation
